@@ -12,6 +12,9 @@
 #include "seal/util/pointer.h"
 #include <unordered_map>
 #include "hexl/hexl.hpp"
+
+#include <iostream>
+
 #endif
 
 using namespace std;
@@ -24,6 +27,44 @@ namespace intel
         // Single threaded SEAL allocator adapter
         template <>
         struct NTT::AllocatorAdapter<seal::MemoryPoolHandle>
+            : public AllocatorInterface<NTT::AllocatorAdapter<seal::MemoryPoolHandle>>
+        {
+            AllocatorAdapter(seal::MemoryPoolHandle handle) : handle_(std::move(handle))
+            {}
+
+            ~AllocatorAdapter()
+            {}
+
+            // interface implementations
+            void *allocate_impl(std::size_t bytes_count)
+            {
+                cache_.push_back(static_cast<seal::util::MemoryPool &>(handle_).get_for_byte_count(bytes_count));
+                return cache_.back().get();
+            }
+
+            void deallocate_impl(void *p, SEAL_MAYBE_UNUSED std::size_t n)
+            {
+                auto it = std::remove_if(
+                    cache_.begin(), cache_.end(),
+                    [p](const seal::util::Pointer<seal::seal_byte> &seal_pointer) { return p == seal_pointer.get(); });
+
+#ifdef SEAL_DEBUG
+                if (it == cache_.end())
+                {
+                    throw std::logic_error("Inconsistent single-threaded allocator cache");
+                }
+#endif
+                cache_.erase(it, cache_.end());
+            }
+
+        private:
+            seal::MemoryPoolHandle handle_;
+            std::vector<seal::util::Pointer<seal::seal_byte>> cache_;
+        };
+
+// Single threaded SEAL allocator adapter
+        template <>
+        struct FFT::AllocatorAdapter<seal::MemoryPoolHandle>
             : public AllocatorInterface<NTT::AllocatorAdapter<seal::MemoryPoolHandle>>
         {
             AllocatorAdapter(seal::MemoryPoolHandle handle) : handle_(std::move(handle))
@@ -82,6 +123,54 @@ namespace intel
         template <>
         struct NTT::AllocatorAdapter<seal::MemoryPoolHandle, SimpleThreadSafePolicy>
             : public AllocatorInterface<NTT::AllocatorAdapter<seal::MemoryPoolHandle, SimpleThreadSafePolicy>>
+        {
+            AllocatorAdapter(seal::MemoryPoolHandle handle, SimpleThreadSafePolicy &&policy)
+                : handle_(std::move(handle)), policy_(std::move(policy))
+            {}
+
+            ~AllocatorAdapter()
+            {}
+            // interface implementations
+            void *allocate_impl(std::size_t bytes_count)
+            {
+                {
+                    // to prevent inline optimization with deadlock
+                    auto accessor = policy_.locker();
+                    cache_.push_back(static_cast<seal::util::MemoryPool &>(handle_).get_for_byte_count(bytes_count));
+                    return cache_.back().get();
+                }
+            }
+
+            void deallocate_impl(void *p, SEAL_MAYBE_UNUSED std::size_t n)
+            {
+                {
+                    // to prevent inline optimization with deadlock
+                    auto accessor = policy_.locker();
+                    auto it = std::remove_if(
+                        cache_.begin(), cache_.end(), [p](const seal::util::Pointer<seal::seal_byte> &seal_pointer) {
+                            return p == seal_pointer.get();
+                        });
+
+#ifdef SEAL_DEBUG
+                    if (it == cache_.end())
+                    {
+                        throw std::logic_error("Inconsistent multi-threaded allocator cache");
+                    }
+#endif
+                    cache_.erase(it, cache_.end());
+                }
+            }
+
+        private:
+            seal::MemoryPoolHandle handle_;
+            SimpleThreadSafePolicy policy_;
+            std::vector<seal::util::Pointer<seal::seal_byte>> cache_;
+        };
+
+        // Multithreaded SEAL allocator adapter
+        template <>
+        struct FFT::AllocatorAdapter<seal::MemoryPoolHandle, SimpleThreadSafePolicy>
+            : public AllocatorInterface<FFT::AllocatorAdapter<seal::MemoryPoolHandle, SimpleThreadSafePolicy>>
         {
             AllocatorAdapter(seal::MemoryPoolHandle handle, SimpleThreadSafePolicy &&policy)
                 : handle_(std::move(handle)), policy_(std::move(policy))
@@ -218,6 +307,68 @@ namespace intel
             get_ntt(N, modulus, root).ComputeInverse(operand, operand, input_mod_factor, output_mod_factor);
         }
 
+        /**
+        Returns a HEXL NTT object corresponding to the given parameters.
+
+        @param[in] N The polynomial modulus degree
+        @param[in] modulus The modulus
+        @param[in] root The root of unity
+        */
+        static intel::hexl::FFT &get_fft(size_t N, double_t* in_scalar)
+        {
+            cout << "Getting FFT" << endl;
+
+            static unordered_map<pair<uint64_t, double_t>, hexl::FFT, HashPair> fft_cache_;
+
+            static seal::util::ReaderWriterLocker fft_cache_locker_;
+
+            pair<uint64_t, uint64_t> key{ N, N };
+
+            // Enable shared access to FFT already present
+            {
+                seal::util::ReaderLock reader_lock(fft_cache_locker_.acquire_read());
+                auto fft_it = fft_cache_.find(key);
+                if (fft_it != fft_cache_.end())
+                {
+                    return fft_it->second;
+                }
+            }
+
+            // Deal with FFT not yet present
+            seal::util::WriterLock write_lock(fft_cache_locker_.acquire_write());
+
+            // Check fft_cache for value (may be added by another thread)
+            auto fft_it = fft_cache_.find(key);
+            if (fft_it == fft_cache_.end())
+            {
+                hexl::FFT fft(N, in_scalar, seal::MemoryManager::GetPool(), hexl::SimpleThreadSafePolicy{});
+                fft_it = fft_cache_.emplace(move(key), move(fft)).first;
+            }
+
+            cout << "Got FFT" << endl;
+            return fft_it->second;
+        }
+
+        /**
+        Computes the forward negacyclic FFT from the given parameters.
+
+        @param[in,out] operand The data on which to compute the FFT.
+        @param[in] N The polynomial modulus degree
+        @param[in] modulus The modulus
+        @param[in] root The root of unity
+        @param[in] input_mod_factor Bounds the input data to the range [0, input_mod_factor * modulus)
+        @param[in] output_mod_factor Bounds the output data to the range [0, output_mod_factor * modulus)
+        */
+        static void compute_forward_fft(std::double_t* operand_real,
+            std::double_t* operand_imag, std::double_t* roots_of_unity_real,
+            std::double_t* roots_of_unity_imag, std::size_t N, std::double_t* in_scalar = nullptr)
+        {
+            cout << "Calling ComputeForwardFFT" << endl;
+            get_fft(N, in_scalar).ComputeForwardFFT(operand_real, operand_imag,
+                                                    operand_real, operand_imag,
+                                                    roots_of_unity_real, roots_of_unity_imag);
+            cout << "Called ComputeForwardFFT" << endl;
+        }
     } // namespace seal_ext
 } // namespace intel
 #endif
@@ -432,6 +583,19 @@ namespace seal
                     I -= modulus;
                 }
             });
+#endif
+        }
+
+        void fft_negacyclic_harvey(std::double_t* operand_real,
+                                   std::double_t* operand_imag,
+                                   std::double_t* roots_of_unity_real,
+                                   std::double_t* roots_of_unity_imag,
+                                   std::size_t N, std::double_t* in_scalar) {
+#ifdef SEAL_USE_INTEL_HEXL
+            intel::seal_ext::compute_forward_fft(operand_real, operand_imag,
+                                                 roots_of_unity_real, 
+                                                 roots_of_unity_imag,
+                                                 N, in_scalar);
 #endif
         }
 

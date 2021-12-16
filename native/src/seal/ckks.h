@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <iostream>
+
 #include "seal/context.h"
 #include "seal/plaintext.h"
 #include "seal/util/common.h"
@@ -11,6 +13,7 @@
 #include "seal/util/dwthandler.h"
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/uintcore.h"
+#include "seal/util/ntt.h"
 #include <cmath>
 #include <complex>
 #include <limits>
@@ -695,6 +698,10 @@ namespace seal
             // Create floating-point representations of the multi-precision integer coefficients
             double two_pow_64 = std::pow(2.0, 64);
             auto res(util::allocate<std::complex<double>>(coeff_count, pool));
+            auto res_real(util::allocate<double>(coeff_count, pool));
+            auto res_imag(util::allocate<double>(coeff_count, pool));
+            auto roots_real(util::allocate<double>(coeff_count, pool));
+            auto roots_imag(util::allocate<double>(coeff_count, pool));
             for (std::size_t i = 0; i < coeff_count; i++)
             {
                 res[i] = 0.0;
@@ -726,6 +733,12 @@ namespace seal
                     }
                 }
 
+                res_real[i] = res[i].real();
+                res_imag[i] = res[i].imag();
+
+                roots_real[i] = root_powers_[i].real();
+                roots_imag[i] = root_powers_[i].imag();
+
                 // Scaling instead incorporated above; this can help in cases
                 // where otherwise pow(two_pow_64, j) would overflow due to very
                 // large coeff_modulus_size and very large scale
@@ -733,6 +746,11 @@ namespace seal
             }
 
             fft_handler_.transform_to_rev(res.get(), logn, root_powers_.get());
+
+            std::cout << "res[0] " << res[0] << std::endl;
+            std::cout << "res_real[0],res_imag[0]  (" << res_real[0] << "," << res_imag[0] << ")" << std::endl;
+            std::cout << "ROOTS root_powers_" << root_powers_[4*coeff_count + -1] << std::endl;
+            util::fft_negacyclic_harvey(res_real.get(), res_imag.get(), roots_real.get(), roots_imag.get(), coeff_count);
 
             for (std::size_t i = 0; i < slots_; i++)
             {
