@@ -230,6 +230,8 @@ namespace seal
 
         void ntt_negacyclic_harvey(CoeffIter operand, const NTTTables &tables);
 
+        void fft_initialize(std::size_t N, std::double_t* in_scalar = nullptr);
+        
         void fft_negacyclic_harvey(std::double_t* operand_real,
             std::double_t* operand_imag, std::double_t* roots_of_unity_real,
             std::double_t* roots_of_unity_imag, std::size_t N, std::double_t* in_scalar = nullptr);

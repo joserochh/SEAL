@@ -316,8 +316,6 @@ namespace intel
         */
         static intel::hexl::FFT &get_fft(size_t N, double_t* in_scalar)
         {
-            cout << "Getting FFT" << endl;
-
             static unordered_map<pair<uint64_t, double_t>, hexl::FFT, HashPair> fft_cache_;
 
             static seal::util::ReaderWriterLocker fft_cache_locker_;
@@ -345,7 +343,6 @@ namespace intel
                 fft_it = fft_cache_.emplace(move(key), move(fft)).first;
             }
 
-            cout << "Got FFT" << endl;
             return fft_it->second;
         }
 
@@ -363,11 +360,9 @@ namespace intel
             std::double_t* operand_imag, std::double_t* roots_of_unity_real,
             std::double_t* roots_of_unity_imag, std::size_t N, std::double_t* in_scalar = nullptr)
         {
-            cout << "Calling ComputeForwardFFT" << endl;
             get_fft(N, in_scalar).ComputeForwardFFT(operand_real, operand_imag,
                                                     operand_real, operand_imag,
                                                     roots_of_unity_real, roots_of_unity_imag);
-            cout << "Called ComputeForwardFFT" << endl;
         }
     } // namespace seal_ext
 } // namespace intel
@@ -586,13 +581,18 @@ namespace seal
 #endif
         }
 
+        void fft_initialize(std::size_t N, std::double_t* in_scalar){
+            intel::seal_ext::get_fft(N, in_scalar);
+        }
+
         void fft_negacyclic_harvey(std::double_t* operand_real,
                                    std::double_t* operand_imag,
                                    std::double_t* roots_of_unity_real,
                                    std::double_t* roots_of_unity_imag,
                                    std::size_t N, std::double_t* in_scalar) {
 #ifdef SEAL_USE_INTEL_HEXL
-            intel::seal_ext::compute_forward_fft(operand_real, operand_imag,
+
+        intel::seal_ext::compute_forward_fft(operand_real, operand_imag,
                                                  roots_of_unity_real, 
                                                  roots_of_unity_imag,
                                                  N, in_scalar);

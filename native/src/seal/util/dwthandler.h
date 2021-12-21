@@ -11,6 +11,7 @@
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/uintcore.h"
 #include <stdexcept>
+#include <iostream>
 
 namespace seal
 {
@@ -106,7 +107,9 @@ namespace seal
                 // variables for indexing
                 std::size_t gap = n >> 1;
                 std::size_t m = 1;
-
+                std::size_t xc = 0;
+                std::size_t yc = 0;
+                std::size_t rc = 0;
                 for (; m < (n >> 1); m <<= 1)
                 {
                     std::size_t offset = 0;
@@ -138,23 +141,31 @@ namespace seal
                             {
                                 u = arithmetic_.guard(*x);
                                 v = arithmetic_.mul_root(*y, r);
-                                *x++ = arithmetic_.add(u, v);
-                                *y++ = arithmetic_.sub(u, v);
+                                *x = arithmetic_.add(u, v);
+                                *y = arithmetic_.sub(u, v);
+                                x++;
+                                y++;
 
                                 u = arithmetic_.guard(*x);
                                 v = arithmetic_.mul_root(*y, r);
-                                *x++ = arithmetic_.add(u, v);
-                                *y++ = arithmetic_.sub(u, v);
+                                *x = arithmetic_.add(u, v);
+                                *y = arithmetic_.sub(u, v);
+                                x++;
+                                y++;
 
                                 u = arithmetic_.guard(*x);
                                 v = arithmetic_.mul_root(*y, r);
-                                *x++ = arithmetic_.add(u, v);
-                                *y++ = arithmetic_.sub(u, v);
+                                *x = arithmetic_.add(u, v);
+                                *y = arithmetic_.sub(u, v);
+                                x++;
+                                y++;
 
                                 u = arithmetic_.guard(*x);
                                 v = arithmetic_.mul_root(*y, r);
-                                *x++ = arithmetic_.add(u, v);
-                                *y++ = arithmetic_.sub(u, v);
+                                *x = arithmetic_.add(u, v);
+                                *y = arithmetic_.sub(u, v);
+                                x++;
+                                y++;
                             }
                             offset += gap << 1;
                         }
@@ -164,9 +175,12 @@ namespace seal
 
                 if (scalar != nullptr)
                 {
+                    xc = 0;
+                    yc = 1;
                     RootType scaled_r;
                     for (std::size_t i = 0; i < m; i++)
                     {
+
                         r = *++roots;
                         scaled_r = arithmetic_.mul_root_scalar(r, *scalar);
                         u = arithmetic_.mul_scalar(arithmetic_.guard(values[0]), *scalar);
@@ -178,6 +192,8 @@ namespace seal
                 }
                 else
                 {
+                    xc = 0;
+                    yc = 1;
                     for (std::size_t i = 0; i < m; i++)
                     {
                         r = *++roots;

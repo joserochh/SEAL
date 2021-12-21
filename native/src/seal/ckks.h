@@ -5,6 +5,7 @@
 
 #include <iostream>
 
+#include "../examples/examples.h"
 #include "seal/context.h"
 #include "seal/plaintext.h"
 #include "seal/util/common.h"
@@ -698,10 +699,10 @@ namespace seal
             // Create floating-point representations of the multi-precision integer coefficients
             double two_pow_64 = std::pow(2.0, 64);
             auto res(util::allocate<std::complex<double>>(coeff_count, pool));
-            auto res_real(util::allocate<double>(coeff_count, pool));
-            auto res_imag(util::allocate<double>(coeff_count, pool));
-            auto roots_real(util::allocate<double>(coeff_count, pool));
-            auto roots_imag(util::allocate<double>(coeff_count, pool));
+            //auto res_real(util::allocate<double>(coeff_count, pool));
+            //auto res_imag(util::allocate<double>(coeff_count, pool));
+            //auto roots_real(util::allocate<double>(coeff_count, pool));
+            //auto roots_imag(util::allocate<double>(coeff_count, pool));
             for (std::size_t i = 0; i < coeff_count; i++)
             {
                 res[i] = 0.0;
@@ -733,11 +734,11 @@ namespace seal
                     }
                 }
 
-                res_real[i] = res[i].real();
-                res_imag[i] = res[i].imag();
+                //res_real[i] = res[i].real();
+                //res_imag[i] = res[i].imag();
 
-                roots_real[i] = root_powers_[i].real();
-                roots_imag[i] = root_powers_[i].imag();
+                //roots_real[i] = root_powers_[i].real();
+                //roots_imag[i] = root_powers_[i].imag();
 
                 // Scaling instead incorporated above; this can help in cases
                 // where otherwise pow(two_pow_64, j) would overflow due to very
@@ -745,15 +746,44 @@ namespace seal
                 // res[i] = res_accum * inv_scale;
             }
 
-            fft_handler_.transform_to_rev(res.get(), logn, root_powers_.get());
+            /*
+            std::cout << "resO = {" << res[0] << "; " << res[1] << "; ";
+            std::cout << res[2] << "; " << res[3] << "}" << std::endl;
 
-            std::cout << "res[0] " << res[0] << std::endl;
-            std::cout << "res_real[0],res_imag[0]  (" << res_real[0] << "," << res_imag[0] << ")" << std::endl;
-            std::cout << "ROOTS root_powers_" << root_powers_[4*coeff_count + -1] << std::endl;
-            util::fft_negacyclic_harvey(res_real.get(), res_imag.get(), roots_real.get(), roots_imag.get(), coeff_count);
+            std::cout << "resN = {(" << res_real[0] << "," << res_imag[0] << "); "; 
+            std::cout << "(" << res_real[1] << "," << res_imag[1] << "); ";
+            std::cout << "(" << res_real[2] << "," << res_imag[2] << "); ";
+            std::cout << "(" << res_real[3] << "," << res_imag[3] << ")}" << std::endl;
+
+            std::cout << "rootsO = {" << root_powers_[0] << "; " << root_powers_[1] << "; ";
+            std::cout << root_powers_[2] << "; " << root_powers_[3] << "}" << std::endl;
+
+            std::cout << "rootsN = {(" << roots_real[0] << "," << roots_imag[0] << "); "; 
+            std::cout << "(" << roots_real[1] << "," << roots_imag[1] << "); ";
+            std::cout << "(" << roots_real[2] << "," << roots_imag[2] << "); ";
+            std::cout << "(" << roots_real[3] << "," << roots_imag[3] << ")}" << std::endl;*/
+
+            //std::cout <<"ROCHA" << std::endl;
+            fft_handler_.transform_to_rev(res.get(), logn, root_powers_.get());
+            //util::fft_negacyclic_harvey(res_real.get(), res_imag.get(), roots_real.get(), roots_imag.get(), coeff_count);
+
+            /*
+            std::cout << "resO = {" << res[0] << "; " << res[1] << "; ";
+            std::cout << res[2] << "; " << res[3] << "}" << std::endl;
+
+            std::cout << "resN = {(" << res_real[0] << "," << res_imag[0] << "); "; 
+            std::cout << "(" << res_real[1] << "," << res_imag[1] << "); ";
+            std::cout << "(" << res_real[2] << "," << res_imag[2] << "); ";
+            std::cout << "(" << res_real[3] << "," << res_imag[3] << ")}" << std::endl;*/
+
+            // Pre-compute HEXL NTT object
+            //util::fft_initialize(coeff_count);
 
             for (std::size_t i = 0; i < slots_; i++)
             {
+                //std::complex<double> tmp(res_real[static_cast<std::size_t>(matrix_reps_index_map_[i])],
+                //res_imag[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
+                //destination[i] = from_complex<T>(tmp);
                 destination[i] = from_complex<T>(res[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
             }
         }
