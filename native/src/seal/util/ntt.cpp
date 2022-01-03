@@ -364,6 +364,28 @@ namespace intel
                                                     operand_real, operand_imag,
                                                     roots_of_unity_real, roots_of_unity_imag);
         }
+
+        static void compute_forward_fftI(std::double_t* operand_interleaved,
+                                        std::double_t* roots_of_unity_interleaved,
+                                        std::size_t N, std::double_t* in_scalar = nullptr)
+        {
+            get_fft(N, in_scalar).ComputeForwardFFTI(operand_interleaved,
+                                                    operand_interleaved,
+                                                    roots_of_unity_interleaved);
+        }
+
+        static void build_floating_points(double_t* res,
+                                  const uint64_t *plain, 
+                                  const uint64_t *threshold, 
+                                  const uint64_t *decryption_modulus, 
+                                  const double_t inv_scale,
+                                  const size_t mod_size, const size_t N)
+        {
+            get_fft(N, nullptr).BuildFloatingPoints(res, plain, threshold,
+                                                      decryption_modulus, 
+                                                      inv_scale,
+                                                      mod_size, N);
+        }
     } // namespace seal_ext
 } // namespace intel
 #endif
@@ -597,6 +619,32 @@ namespace seal
                                                  roots_of_unity_imag,
                                                  N, in_scalar);
 #endif
+        }
+
+        void fft_negacyclic_harveyI(std::double_t* operand_interleaved,
+                                   std::double_t* roots_of_unity_interleaved,
+                                   std::size_t N, std::double_t* in_scalar) {
+#ifdef SEAL_USE_INTEL_HEXL
+
+        intel::seal_ext::compute_forward_fftI(operand_interleaved,
+                                             roots_of_unity_interleaved, 
+                                             N, in_scalar);
+#endif
+        }
+
+        void fft_build_floating_points(double_t* res,
+                                  const uint64_t *plain, 
+                                  const uint64_t *threshold, 
+                                  const uint64_t *decryption_modulus, 
+                                  const double_t inv_scale,
+                                  const size_t mod_size, const size_t coeff_count) {
+#ifdef SEAL_USE_INTEL_HEXL
+
+        intel::seal_ext::build_floating_points(res, plain, threshold,
+                                               decryption_modulus, inv_scale,
+                                               mod_size, coeff_count);
+#endif
+
         }
 
         void inverse_ntt_negacyclic_harvey_lazy(CoeffIter operand, const NTTTables &tables)

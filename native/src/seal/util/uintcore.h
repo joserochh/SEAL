@@ -11,6 +11,7 @@
 #include <cstring>
 #include <limits>
 #include <stdexcept>
+#include <iostream>
 
 namespace seal
 {
@@ -406,10 +407,11 @@ namespace seal
             int result = 0;
             operand1 += uint64_count - 1;
             operand2 += uint64_count - 1;
-
+            
             for (; (result == 0) && uint64_count--; operand1--, operand2--)
             {
                 result = (*operand1 > *operand2) - (*operand1 < *operand2);
+                //std::cout << "\t Result=" << result << " = (" << *operand1 << ">" << *operand2 << ")-("<< *operand1 << "<" << *operand2 << ")" << std::endl;
             }
             return result;
         }

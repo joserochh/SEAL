@@ -638,6 +638,8 @@ namespace seal
                             std::is_same<std::remove_cv_t<T>, std::complex<double>>::value>>
         void decode_internal(const Plaintext &plain, T *destination, MemoryPoolHandle pool)
         {
+            //std::cout <<"ROCHA 0" << std::endl;
+
             // Verify parameters.
             if (!is_valid_for(plain, context_))
             {
@@ -698,13 +700,55 @@ namespace seal
 
             // Create floating-point representations of the multi-precision integer coefficients
             double two_pow_64 = std::pow(2.0, 64);
-            auto res(util::allocate<std::complex<double>>(coeff_count, pool));
-            //auto res_real(util::allocate<double>(coeff_count, pool));
-            //auto res_imag(util::allocate<double>(coeff_count, pool));
-            //auto roots_real(util::allocate<double>(coeff_count, pool));
-            //auto roots_imag(util::allocate<double>(coeff_count, pool));
+            //auto res(util::allocate<std::complex<double>>(coeff_count, pool));
+            /*
+            auto res_real(util::allocate<double>(coeff_count, pool, 0));
+            auto res_imag(util::allocate<double>(coeff_count, pool, 0));
+            auto roots_real(util::allocate<double>(coeff_count, pool));
+            auto roots_imag(util::allocate<double>(coeff_count, pool));
+            */
+            
+            auto res_interleaved(util::allocate<double>(2*coeff_count, pool, 0));
+            //auto roots_interleaved(util::allocate<double>(2*coeff_count, pool));
+            /*
+            std::size_t real_idx = -8;
+            std::size_t imag_idx = 0; 
+            std::size_t root_idx = 0; 
+            */
+            ///*
+            util::fft_build_floating_points(res_interleaved.get(), plain_copy.get(),
+                                            upper_half_threshold,
+                                            decryption_modulus,
+                                            inv_scale,
+                                            coeff_modulus_size, coeff_count);
+            //std::cout <<"ROCHA Coeff  = " << coeff_modulus_size << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl;
+            //std::size_t root_idx = 0;
+
+            //double * last_root = &reinterpret_cast<double(&)[2]>( root_powers_[coeff_count] )[1];
+            //std::vector<double> hola{0, 1, 2, 3, 4, 5};
+            //double hola2[] = {0, 1, 2, 3, 4, 5};
+            //double&& s_ref = &hola2;
+            //auto roots_interleaved(util::allocate< vector<double>::iterator >(hola.begin(), 6, pool));
+            //for (std::size_t i = 0; i < coeff_count; i++)
+            //{    
+                //roots_real[i] = root_powers_[i].real();
+                //roots_imag[i] = root_powers_[i].imag();
+                //roots_interleaved[root_idx++] = root_powers_[i].real();
+                //roots_interleaved[root_idx++] = root_powers_[i].imag();
+                //std::cout << " r = " << rp << " *r = " << *rp << "(" << root_powers_[i].real() << ") i = " << ip << " *i = " << *ip << "(" << root_powers_[i].imag() << ")" << std::endl;
+                //rp+=2;
+                //ip+=2;
+            //}
+            //*/
+            /*
             for (std::size_t i = 0; i < coeff_count; i++)
             {
+                
+                //if ((i & 7) == 0) {
+                //    real_idx += 8;
+                //    imag_idx += 8;
+                //}
+
                 res[i] = 0.0;
                 if (util::is_greater_than_or_equal_uint(
                         plain_copy.get() + (i * coeff_modulus_size), upper_half_threshold, coeff_modulus_size))
@@ -712,15 +756,20 @@ namespace seal
                     double scaled_two_pow_64 = inv_scale;
                     for (std::size_t j = 0; j < coeff_modulus_size; j++, scaled_two_pow_64 *= two_pow_64)
                     {
+                        auto curr_coeff = plain_copy[i * coeff_modulus_size + j];
                         if (plain_copy[i * coeff_modulus_size + j] > decryption_modulus[j])
                         {
                             auto diff = plain_copy[i * coeff_modulus_size + j] - decryption_modulus[j];
-                            res[i] += diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0;
+                            //if(i%8 == 0) std::cout << "i = " << i << ", geth 1, ltth 0" << ", curr_coeff " << plain_copy[i * coeff_modulus_size + j] << ", dec_mod " << decryption_modulus[j] << ", gtdm 1, ledm 0, v_diff " << diff << ", v_cdiff " << static_cast<double>(diff) << ", v_sdiff " << (diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0) << ", sp64 " << scaled_two_pow_64; 
+                            res[i]  += diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0;
+                            //if(i%8 == 0) std::cout << ", Res " << res[i] << std::endl;  
                         }
                         else
                         {
                             auto diff = decryption_modulus[j] - plain_copy[i * coeff_modulus_size + j];
-                            res[i] -= diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0;
+                            //if(i%8 == 0) std::cout << "i = " << i << ", geth 1, ltth 0" << ", curr_coeff " << plain_copy[i * coeff_modulus_size + j] << ", dec_mod " << decryption_modulus[j] << ", gtdm 0, ledm 1, v_diff " << diff << ", v_cdiff " << static_cast<double>(diff) << ", v_sdiff " << (diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0) << ", sp64 " << scaled_two_pow_64; 
+                            res[i]  -= diff ? static_cast<double>(diff) * scaled_two_pow_64 : 0.0;
+                            //if(i%8 == 0) std::cout << ", Res " << res[i] << std::endl;
                         }
                     }
                 }
@@ -730,13 +779,21 @@ namespace seal
                     for (std::size_t j = 0; j < coeff_modulus_size; j++, scaled_two_pow_64 *= two_pow_64)
                     {
                         auto curr_coeff = plain_copy[i * coeff_modulus_size + j];
-                        res[i] += curr_coeff ? static_cast<double>(curr_coeff) * scaled_two_pow_64 : 0.0;
+                        //if(i%8 == 0) std::cout << "i = " << i << ", geth 0, ltth 1" << ", curr_coeff " << plain_copy[i * coeff_modulus_size + j] << ", dec_mod " << decryption_modulus[j] << ", gtdm 0, ledm 0, v_diff " << curr_coeff << ", v_cdiff " << static_cast<double>(curr_coeff) << ", v_sdiff " << (curr_coeff ? static_cast<double>(curr_coeff) * scaled_two_pow_64 : 0.0) << ", sp64 " << scaled_two_pow_64; 
+                        res[i]  += curr_coeff ? static_cast<double>(curr_coeff) * scaled_two_pow_64 : 0.0;
+                        //if(i%8 == 0) std::cout << ", Res " << res[i] << std::endl;
                     }
                 }
-
+                //std::cout << "i = " << i << " Returned " << res[i] << std::endl;
+                //std::cout << "real idx " << real_idx << " imag idx " << imag_idx << " i " << i << std::endl;
+         
+                //res_interleaved[real_idx++] = res[i].real();
+                //res_interleaved[imag_idx++] = res[i].imag();
+                //roots_interleaved[root_idx++] = root_powers_[i].real();
+                //roots_interleaved[root_idx++] = root_powers_[i].imag();
+  
                 //res_real[i] = res[i].real();
                 //res_imag[i] = res[i].imag();
-
                 //roots_real[i] = root_powers_[i].real();
                 //roots_imag[i] = root_powers_[i].imag();
 
@@ -744,8 +801,25 @@ namespace seal
                 // where otherwise pow(two_pow_64, j) would overflow due to very
                 // large coeff_modulus_size and very large scale
                 // res[i] = res_accum * inv_scale;
-            }
+            }*/
+            
+            /*
+            std::cout << "resO = {" << res[0] << "; " << res[1] << "; ";
+            std::cout << res[2] << "; " << res[3] << "}" << std::endl;
 
+            std::cout << "resN = {(" << res_interleaved[0] << "," << res_interleaved[8] << "); "; 
+            std::cout << "(" << res_interleaved[1] << "," << res_interleaved[9] << "); ";
+            std::cout << "(" << res_interleaved[2] << "," << res_interleaved[10] << "); ";
+            std::cout << "(" << res_interleaved[3] << "," << res_interleaved[11] << ")}" << std::endl;
+
+            std::cout << "rootsO = {" << root_powers_[0] << "; " << root_powers_[1] << "; ";
+            std::cout << root_powers_[2] << "; " << root_powers_[3] << "}" << std::endl;
+
+            std::cout << "rootsN = {(" << roots_interleaved[0] << "," << roots_interleaved[1] << "); "; 
+            std::cout << "(" << roots_interleaved[2] << "," << roots_interleaved[3] << "); ";
+            std::cout << "(" << roots_interleaved[4] << "," << roots_interleaved[5] << "); ";
+            std::cout << "(" << roots_interleaved[6] << "," << roots_interleaved[7] << ")}" << std::endl;
+            */
             /*
             std::cout << "resO = {" << res[0] << "; " << res[1] << "; ";
             std::cout << res[2] << "; " << res[3] << "}" << std::endl;
@@ -761,12 +835,16 @@ namespace seal
             std::cout << "rootsN = {(" << roots_real[0] << "," << roots_imag[0] << "); "; 
             std::cout << "(" << roots_real[1] << "," << roots_imag[1] << "); ";
             std::cout << "(" << roots_real[2] << "," << roots_imag[2] << "); ";
-            std::cout << "(" << roots_real[3] << "," << roots_imag[3] << ")}" << std::endl;*/
+            std::cout << "(" << roots_real[3] << "," << roots_imag[3] << ")}" << std::endl;
+            */
 
-            //std::cout <<"ROCHA" << std::endl;
-            fft_handler_.transform_to_rev(res.get(), logn, root_powers_.get());
-            //util::fft_negacyclic_harvey(res_real.get(), res_imag.get(), roots_real.get(), roots_imag.get(), coeff_count);
+            //std::cout <<"ROCHA 1     " << std::endl;
+            
+            //util::fft_negacyclic_harvey(res_real.get(), res_imag.get(),  roots_real.get(), roots_imag.get(), coeff_count);
+            //std::cout <<"ROCHA " << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl << std::endl;
+            util::fft_negacyclic_harveyI(res_interleaved.get(), &reinterpret_cast<double(&)[2]>( root_powers_[0] )[0], coeff_count);
 
+            //fft_handler_.transform_to_rev(res.get(), logn, root_powers_.get());
             /*
             std::cout << "resO = {" << res[0] << "; " << res[1] << "; ";
             std::cout << res[2] << "; " << res[3] << "}" << std::endl;
@@ -781,11 +859,22 @@ namespace seal
 
             for (std::size_t i = 0; i < slots_; i++)
             {
-                //std::complex<double> tmp(res_real[static_cast<std::size_t>(matrix_reps_index_map_[i])],
-                //res_imag[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
-                //destination[i] = from_complex<T>(tmp);
-                destination[i] = from_complex<T>(res[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
+                
+                ///*
+                std::size_t idx = static_cast<std::size_t>(matrix_reps_index_map_[i]);
+                idx += (idx/8) * 8;
+                std::complex<double> tmp1(res_interleaved[idx], res_interleaved[idx + 8]);
+                destination[i] = from_complex<T>(tmp1);
+                //*/
+                /*
+                std::complex<double> tmp(res_real[static_cast<std::size_t>(matrix_reps_index_map_[i])],
+                res_imag[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
+                destination[i] = from_complex<T>(tmp);
+                */
+                
+                //destination[i] = from_complex<T>(res[static_cast<std::size_t>(matrix_reps_index_map_[i])]);
             }
+            //std::cout <<"ROCHA 3" << std::endl;
         }
 
         void encode_internal(

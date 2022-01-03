@@ -235,6 +235,17 @@ namespace seal
         void fft_negacyclic_harvey(std::double_t* operand_real,
             std::double_t* operand_imag, std::double_t* roots_of_unity_real,
             std::double_t* roots_of_unity_imag, std::size_t N, std::double_t* in_scalar = nullptr);
+
+        void fft_negacyclic_harveyI(std::double_t* operand_interleaved,
+                                   std::double_t* roots_of_unity_interleaved,
+                                   std::size_t N, std::double_t* in_scalar = nullptr);
+
+        void fft_build_floating_points(double_t* res,
+                               const uint64_t *plain, 
+                               const uint64_t *threshold, 
+                               const uint64_t *decryption_modulus, 
+                               const double_t inv_scale,
+                               const size_t mod_size, const size_t coeff_count);
             
         inline void ntt_negacyclic_harvey(RNSIter operand, std::size_t coeff_modulus_size, ConstNTTTablesIter tables)
         {
